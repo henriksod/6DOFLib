@@ -1,0 +1,23 @@
+#######################################
+# Syntax Coloring Map For Ethernet
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+SixDOF	KEYWORD1	SixDOF
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+forwardKinematics	KEYWORD2
+inverseKinematics	KEYWORD2
+getPose KEYWORD2
+getJointAngles	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
