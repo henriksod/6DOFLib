@@ -31,13 +31,21 @@ class SixDOF
 {
   public:
 
-    SixDOF(float* thetas, float* ds, float* alphas, float* as);
+    SixDOF(float* thetas, float* ds, float* alphas, float* as, int len);
     
     void forwardKinematics(float* angles);
     int inverseKinematics(float x, float y, float z, float theta, float phi, float psi);
     
     void getPose(float* returnPose);
     void getJointAngles(float* returnAngles);
+    
+    void screwZ(float theta, float d, mtx_type* H);
+    void screwX(float alpha, float a, mtx_type* H);
+    void crossProduct(mtx_type* u, mtx_type* v, mtx_type* w);
+    float angleDiff(mtx_type* v, mtx_type* u);
+    float determinant(mtx_type* M, int len);
+    
+    bool error = false;
 
   private:
   
@@ -47,11 +55,15 @@ class SixDOF
     mtx_type bufferV[3];
     mtx_type bufferU[3];
     mtx_type bufferH[4][4];
+    mtx_type bufferH2[4][4];
     
     // Manipulator Jacobian
-    mtx_type* J[6];
-    mtx_type** invJ;
-    mtx_type** bufferJ;
+    mtx_type* J;
+    mtx_type* invJ;
+    mtx_type* bufferJ;
+    mtx_type* bufferJ2;
+
+    mtx_type bufferPose[6];
     
     //Manipulator pose
     mtx_type pose[6];
@@ -59,6 +71,15 @@ class SixDOF
     
     //Joint angle differences
     mtx_type* dAngles;
+
+    // Unit vectors
+    mtx_type v_i[3];
+    mtx_type v_j[3];
+    mtx_type v_k[3];
+
+    mtx_type zPrev[3];
+    mtx_type oPrev[3];
+    mtx_type oEnd[3];
  
     // Joint struct (Revolute)
     typedef struct 
@@ -94,14 +115,9 @@ class SixDOF
     // List of links that makes up the manipulator
     Link* links;
     
-    void computeDH(float theta, float d, float alpha, float a, mtx_type** H);
-    void computeJointJacobian(mtx_type** endH, mtx_type** prevH, mtx_type* J);
-    
-    void screwZ(float theta, float d, mtx_type** H);
-    void screwX(float alpha, float a, mtx_type** H);
-    void crossProduct(mtx_type* u, mtx_type* v, mtx_type* w);
-    float angleDiff(mtx_type* v, mtx_type* u);
-    float determinant(mtx_type** M);
+    void computeDH(float theta, float d, float alpha, float a, mtx_type* H);
+    void computeJointJacobian(mtx_type* endH, mtx_type* prevH, mtx_type* J);
+   
     
 };
 
