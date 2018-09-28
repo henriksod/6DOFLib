@@ -13,9 +13,11 @@ float ds[] = {0.25, 0, 0, 0.2, 0, 0.2};
 float alphas[] = {PI/2, 0, -PI/2, PI/2, PI/2, 0};
 float as[] = {0, 0.25, 0, 0, 0, 0};
 
-float jointAngles[] = {0, PI/4, 0, 0, PI/4, 0};
+float jointAngles[] = {0.3, PI/3, PI/2, 0.3, -PI/3, 0};
 
 float pose[] = {0, 0, 0, 0, 0, 0};
+
+SixDOF manipulator(thetas, ds, alphas, as, 6);
 
 void setup() {
   Serial.begin(9600);
@@ -32,27 +34,17 @@ void setup() {
   Serial.print("\t");
   Serial.print("psi");
   Serial.println();
-  
+
   delay(50);
+  
+  Serial.println("Compute kin");
+  manipulator.forwardKinematics(jointAngles);
+  Serial.println("done");
 }
 
 void loop() {
 
-  Serial.println("Compute const");
-  SixDOF manipulator(thetas, ds, alphas, as, 6);
-   Serial.println("done");
-
-Serial.println("Compute kin");
-  manipulator.forwardKinematics(jointAngles);
-Serial.println("done");
-
-  Serial.println("Compute invkin");
-  int success = manipulator.inverseKinematics(-0.5182, 0, 0.5682, -PI/2, PI, -PI/2);
-  Serial.print(success);
-  Serial.println(" done");
-
-  Serial.println();
-  
+  int success = manipulator.inverseKinematics(-0.5165, 0, 0.2018, PI/2, PI, PI/2, 0.001);
   manipulator.getPose(pose);
 
   // Angles are printed in degrees.
@@ -70,7 +62,7 @@ Serial.println("done");
   Serial.print(pose[5]);
   Serial.println();
 
-  manipulator.getJointAngles(jointAngles);
+  /*manipulator.getJointAngles(jointAngles);
   Serial.print(jointAngles[0]);
   Serial.print("\t");
   Serial.print(jointAngles[1]);
@@ -82,8 +74,6 @@ Serial.println("done");
   Serial.print(jointAngles[4]);
   Serial.print("\t");
   Serial.print(jointAngles[5]);
-  Serial.println();
-
-  while(1);
+  Serial.println();*/
 }
 

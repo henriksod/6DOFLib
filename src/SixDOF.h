@@ -25,7 +25,12 @@
 
 #include "MatrixMath.h"
 
-#define JACOBIAN_SINGULARITY_THRESHOLD 0.001
+#define INVERSE_JACOBIAN_METHOD
+//#define PSEUDO_INVERSE_JACOBIAN_METHOD
+//#define TRANSPOSE_JACOBIAN_METHOD
+
+#define JACOBIAN_SINGULARITY_THRESHOLD 0.00001
+#define ALPHA 0.1
 
 class SixDOF
 {
@@ -34,7 +39,7 @@ class SixDOF
     SixDOF(float* thetas, float* ds, float* alphas, float* as, int len);
     
     void forwardKinematics(float* angles);
-    int inverseKinematics(float x, float y, float z, float theta, float phi, float psi);
+    int inverseKinematics(float x, float y, float z, float theta, float phi, float psi, float dt);
     
     void getPose(float* returnPose);
     void getJointAngles(float* returnAngles);
@@ -56,12 +61,15 @@ class SixDOF
     mtx_type bufferU[3];
     mtx_type bufferH[4][4];
     mtx_type bufferH2[4][4];
+
+    mtx_type eye[4][4];
     
     // Manipulator Jacobian
     mtx_type* J;
     mtx_type* invJ;
+    mtx_type* bufferinvJ;
+    mtx_type* transposeJ;
     mtx_type* bufferJ;
-    mtx_type* bufferJ2;
 
     mtx_type bufferPose[6];
     
