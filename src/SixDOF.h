@@ -43,14 +43,6 @@ class SixDOF
     
     void getPose(float* returnPose);
     void getJointAngles(float* returnAngles);
-    
-    void screwZ(float theta, float d, mtx_type* H);
-    void screwX(float alpha, float a, mtx_type* H);
-    void crossProduct(mtx_type* u, mtx_type* v, mtx_type* w);
-    float angleDiff(mtx_type* v, mtx_type* u);
-    float determinant(mtx_type* M, int len);
-    
-    bool error = false;
 
   private:
   
@@ -125,7 +117,11 @@ class SixDOF
     
     void computeDH(float theta, float d, float alpha, float a, mtx_type* H);
     void computeJointJacobian(mtx_type* endH, mtx_type* prevH, mtx_type* J);
-   
+    void screwZ(float theta, float d, mtx_type* H);
+    void screwX(float alpha, float a, mtx_type* H);
+    void crossProduct(mtx_type* u, mtx_type* v, mtx_type* w);
+    float angleDiff(mtx_type* v, mtx_type* u);
+    float determinant(mtx_type* M, int len);
     
 };
 

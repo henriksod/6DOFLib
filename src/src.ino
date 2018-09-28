@@ -1,9 +1,3 @@
-/********************************************************
- * FABRIK2D 3DOF example
- * Creating the FABRIK object and moving the end effector in a circular motion.
- * You can use whichever unit you want for coordinates, lengths and tolerances as long as you are consistent.
- * Default unit is millimeters.
- ********************************************************/
 
 #include "SixDOF.h"
 #include "MatrixMath.h"
