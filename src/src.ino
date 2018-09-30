@@ -1,15 +1,21 @@
 
 #include "SixDOF.h"
 #include "MatrixMath.h"
+#include "MemoryFree.h"
 
-float thetas[] = {0, PI/2, -PI/2, 0, PI, 0};
-float ds[] = {0.25, 0, 0, 0.2, 0, 0.2};
-float alphas[] = {PI/2, 0, -PI/2, PI/2, PI/2, 0};
-float as[] = {0, 0.25, 0, 0, 0, 0};
+double thetas[] = {0, PI/2, -PI/2, 0, PI, 0};
+double ds[] = {0.25, 0, 0, 0.2, 0, 0.2};
+double alphas[] = {PI/2, 0, -PI/2, PI/2, PI/2, 0};
+double as[] = {0, 0.25, 0, 0, 0, 0};
 
-float jointAngles[] = {0.3, PI/3, PI/2, 0.3, -PI/3, 0};
+double jointAngles[] = {0, PI/3, PI/2, 0, -PI/4, 0};
+double jointAngles2[] = {0, PI/4, 0, 0, PI/3, 0};
+double jointAngles3[] = {0, 0, 0, 0, 0.1, 0};
 
-float pose[] = {0, 0, 0, 0, 0, 0};
+double pose[] = {0, 0, 0, 0, 0, 0};
+
+double desiredPose1[] = {-0.4501, 0.15, 0.5777, 2.2923, 1.5234, -0.6599};
+double desiredPose2[] = {-0.4485, 0.1225, 0.1147, 2.3934, 2.0215, 0.5019};  
 
 SixDOF manipulator(thetas, ds, alphas, as, 6);
 
@@ -31,16 +37,18 @@ void setup() {
 
   delay(50);
   
-  Serial.println("Compute kin");
   manipulator.forwardKinematics(jointAngles);
-  Serial.println("done");
+  
+  Serial.print("Free memory: ");
+  Serial.println(freeMemory());
+  Serial.println();
 }
 
 void loop() {
 
-  int success = manipulator.inverseKinematics(-0.5165, 0, 0.2018, PI/2, PI, PI/2, 0.001);
   manipulator.getPose(pose);
 
+  
   // Angles are printed in degrees.
   // The function calls below shows how easy it is to get the results from the inverse kinematics solution.
   Serial.print(pose[0]);
@@ -54,8 +62,92 @@ void loop() {
   Serial.print(pose[4]);
   Serial.print("\t");
   Serial.print(pose[5]);
-  Serial.println();
+  Serial.println(); Serial.println();
 
+  do {
+
+    manipulator.inverseKinematics(desiredPose1[0], 
+                                  desiredPose1[1], 
+                                  desiredPose1[2], 
+                                  desiredPose1[3], 
+                                  desiredPose1[4], 
+                                  desiredPose1[5], 0.01);
+
+
+    manipulator.getPose(pose);
+  
+    // Angles are printed in degrees.
+    // The function calls below shows how easy it is to get the results from the inverse kinematics solution.
+    Serial.print(pose[0]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose1[0]);
+    Serial.print("\t");
+    Serial.print(pose[1]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose1[1]);
+    Serial.print("\t");
+    Serial.print(pose[2]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose1[2]);
+    Serial.print("\t");
+    Serial.print(pose[3]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose1[3]);
+    Serial.print("\t");
+    Serial.print(pose[4]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose1[4]);
+    Serial.print("\t");
+    Serial.print(pose[5]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose1[5]);
+    Serial.println();
+
+  } while (manipulator.getIKStatus() == SixDOF::SUCCESS);
+
+  Serial.println("============================================");
+
+  do {
+
+    manipulator.inverseKinematics(desiredPose2[0], 
+                                  desiredPose2[1], 
+                                  desiredPose2[2], 
+                                  desiredPose2[3], 
+                                  desiredPose2[4], 
+                                  desiredPose2[5], 0.01);
+  
+    
+    manipulator.getPose(pose);
+  
+    // Angles are printed in degrees.
+    // The function calls below shows how easy it is to get the results from the inverse kinematics solution.
+    Serial.print(pose[0]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose2[0]);
+    Serial.print("\t");
+    Serial.print(pose[1]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose2[1]);
+    Serial.print("\t");
+    Serial.print(pose[2]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose2[2]);
+    Serial.print("\t");
+    Serial.print(pose[3]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose2[3]);
+    Serial.print("\t");
+    Serial.print(pose[4]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose2[4]);
+    Serial.print("\t");
+    Serial.print(pose[5]);
+    Serial.print(" --> ");
+    Serial.print(desiredPose2[5]);
+    Serial.println();
+    
+  } while (manipulator.getIKStatus() == SixDOF::SUCCESS);
+  
   /*manipulator.getJointAngles(jointAngles);
   Serial.print(jointAngles[0]);
   Serial.print("\t");
@@ -69,5 +161,7 @@ void loop() {
   Serial.print("\t");
   Serial.print(jointAngles[5]);
   Serial.println();*/
+
+  while(1);
 }
 

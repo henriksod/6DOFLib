@@ -29,20 +29,32 @@
 //#define PSEUDO_INVERSE_JACOBIAN_METHOD
 //#define TRANSPOSE_JACOBIAN_METHOD
 
-#define JACOBIAN_SINGULARITY_THRESHOLD 0.00001
-#define ALPHA 0.1
+#define SINGULARITY_THRESHOLD 0.00001
+#define REACHED_DESTINATION_THRESHOLD 0.01
 
 class SixDOF
 {
   public:
 
-    SixDOF(float* thetas, float* ds, float* alphas, float* as, int len);
+    enum IKState {
+        FAILED = -1,
+        SUCCESS = 0,
+        DEST_REACHED = 2
+    };
+    typedef enum IKState IKState_t;
+
+    SixDOF(double* thetas, double* ds, double* alphas, double* as, int len);
     
-    void forwardKinematics(float* angles);
-    int inverseKinematics(float x, float y, float z, float theta, float phi, float psi, float dt);
+    void forwardKinematics(double* angles);
+    //IKState_t inverseKinematics(double x, double y, double z, double ax, double ay, double az, double theta, double alpha);
+
+    IKState_t inverseKinematics(double x, double y, double z, double phi, double theta, double psi, double alpha);
+    //IKState_t inverseKinematics(double x, double y, double z, double phi, double theta, double psi);
     
-    void getPose(float* returnPose);
-    void getJointAngles(float* returnAngles);
+    void getPose(double* returnPose);
+    void getJointAngles(double* returnAngles);
+
+    IKState_t getIKStatus();
 
   private:
   
@@ -51,8 +63,22 @@ class SixDOF
     
     mtx_type bufferV[3];
     mtx_type bufferU[3];
+    mtx_type bufferW[3];
+    mtx_type bufferX[3];
+    mtx_type bufferY[3];
+    mtx_type bufferZ[3];
     mtx_type bufferH[4][4];
     mtx_type bufferH2[4][4];
+    mtx_type bufferR[3][3];
+    mtx_type bufferR2[3][3];
+    mtx_type bufferR3[3][3];
+    mtx_type bufferR4[3][3];
+    mtx_type bufferR5[3][3];
+    
+    mtx_type bufferAX[4];
+    mtx_type bufferAY[4];
+
+    mtx_type oc[3];
 
     mtx_type eye[4][4];
     
@@ -80,18 +106,20 @@ class SixDOF
     mtx_type zPrev[3];
     mtx_type oPrev[3];
     mtx_type oEnd[3];
+
+    IKState_t ikStatus;
  
     // Joint struct (Revolute)
     typedef struct 
     {
         // Position (global) and angle of joint
-        float x;
-        float y;
-        float z;
-        float a;
+        double x;
+        double y;
+        double z;
+        double a;
         
         // DH Parameters of joint
-        float DH_Params[4];
+        double DH_Params[4];
         
         // Joint Jacobian
         mtx_type J[6]; // The size does not correspond to numJoints!
@@ -101,7 +129,7 @@ class SixDOF
     
     typedef struct 
     {
-        float length;
+        double length;
         
         Joint* fromJoint;
         Joint* toJoint;
@@ -115,13 +143,29 @@ class SixDOF
     // List of links that makes up the manipulator
     Link* links;
     
-    void computeDH(float theta, float d, float alpha, float a, mtx_type* H);
+    void computeDH(double theta, double d, double alpha, double a, mtx_type* H);
     void computeJointJacobian(mtx_type* endH, mtx_type* prevH, mtx_type* J);
-    void screwZ(float theta, float d, mtx_type* H);
-    void screwX(float alpha, float a, mtx_type* H);
+    void screwZ(double theta, double d, mtx_type* H);
+    void screwX(double alpha, double a, mtx_type* H);
     void crossProduct(mtx_type* u, mtx_type* v, mtx_type* w);
-    float angleDiff(mtx_type* v, mtx_type* u);
-    float determinant(mtx_type* M, int len);
+    double angleDiff(mtx_type* v, mtx_type* u);
+    double vecDistance(mtx_type* from, mtx_type* to);
+    double determinant(mtx_type* M, int len);
+
+    /*
+    void rot2axis(mtx_type* R, mtx_type* ax);
+    void axis2rot(mtx_type* ax, mtx_type* R);
+    void eigDecomp(mtx_type* A, int m, int n, int iterations, mtx_type* out);
+    */
+
+    
+    void rotZ(double theta, mtx_type* R);
+    void rotY(double phi, mtx_type* R);
+    void rotX(double psi, mtx_type* R);
+   
+    void rot2euler(mtx_type* R, mtx_type* euler);
+    void euler2rot(mtx_type* euler, mtx_type* R);
+    void euler2angvel(mtx_type* eulerFrom, mtx_type* eulerTo, mtx_type* angVel);
     
 };
 

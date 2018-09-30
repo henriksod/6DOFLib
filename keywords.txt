@@ -16,6 +16,7 @@ forwardKinematics	KEYWORD2
 inverseKinematics	KEYWORD2
 getPose KEYWORD2
 getJointAngles	KEYWORD2
+getIKStatus	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)
