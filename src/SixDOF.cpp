@@ -24,17 +24,18 @@
 #include "Arduino.h"
 #include "SixDOF.h"
 
+#include "MemoryFree.h"
 
 SixDOF::SixDOF(double* thetas, double* ds, double* alphas, double* as, int len)
 {
     this->numJoints = len;
     this->numLinks = this->numJoints+1;
     
-    this->links = (Link*)malloc(sizeof(Link)*(this->numLinks));
+    this->links = new Link[this->numLinks];
 
     for (int i = 0; i < this->numLinks-1; i++)
     {
-        this->links[i].fromJoint = (Joint*)malloc(sizeof(Joint));
+        this->links[i].fromJoint = new Joint[1];
         
         this->links[i].fromJoint->x = 0;
         this->links[i].fromJoint->y = 0;
@@ -50,7 +51,7 @@ SixDOF::SixDOF(double* thetas, double* ds, double* alphas, double* as, int len)
         this->links[i].isEndEffector = false;
 
         if (i > 0) {
-            this->links[i-1].toJoint = (Joint*)malloc(sizeof(Joint));
+            this->links[i-1].toJoint = new Joint[1];
             this->links[i-1].toJoint = links[i].fromJoint;
         }
     }
@@ -62,15 +63,14 @@ SixDOF::SixDOF(double* thetas, double* ds, double* alphas, double* as, int len)
     this->eye[1][0] = 0; this->eye[1][1] = 1; this->eye[1][2] = 0; this->eye[1][3] = 0;
     this->eye[2][0] = 0; this->eye[2][1] = 0; this->eye[2][2] = 1; this->eye[2][3] = 0;
     this->eye[3][0] = 0; this->eye[3][1] = 0; this->eye[3][2] = 0; this->eye[3][3] = 1;
+/*
+    this->J          = new mtx_type[6 * this->numJoints];
+    this->invJ       = new mtx_type[6 * this->numJoints];
+    this->bufferJ    = new mtx_type[6 * this->numJoints];
+    this->bufferinvJ = new mtx_type[this->numJoints * this->numJoints];
+    this->transposeJ = new mtx_type[6 * this->numJoints];
+    */
 
-    this->J          = (mtx_type*)malloc(6 * this->numJoints * sizeof(mtx_type));
-    this->invJ       = (mtx_type*)malloc(this->numJoints * 6 * sizeof(mtx_type));
-    this->bufferJ    = (mtx_type*)malloc(6 * this->numJoints * sizeof(mtx_type));
-    this->bufferinvJ = (mtx_type*)malloc(this->numJoints * this->numJoints * sizeof(mtx_type));
-    this->transposeJ = (mtx_type*)malloc(this->numJoints * 6 * sizeof(mtx_type));
-    
-    this->dAngles = (mtx_type*)malloc(sizeof(mtx_type)*this->numJoints);
-    
     this->pose[0] = 0;
     this->pose[1] = 0;
     this->pose[2] = 0;
@@ -93,13 +93,6 @@ SixDOF::SixDOF(double* thetas, double* ds, double* alphas, double* as, int len)
 
 void SixDOF::getPose(double* returnPose)
 {
-    Link endEffector = this->links[this->numJoints-1];
-    
-    this->pose[0] = endEffector.H0[0][3];
-    this->pose[1] = endEffector.H0[1][3];
-    this->pose[2] = endEffector.H0[2][3];
-
-    
     returnPose[0] = (double)this->pose[0];
     returnPose[1] = (double)this->pose[1];
     returnPose[2] = (double)this->pose[2];
@@ -110,9 +103,9 @@ void SixDOF::getPose(double* returnPose)
 
 void SixDOF::getJointAngles(double* returnAngles)
 {
-    for (int i = 1; i < this->numLinks; i++)
+    for (int i = 0; i < this->numJoints; i++)
     {
-        returnAngles[i-1] = this->links[i-1].fromJoint->a;
+        returnAngles[i] = this->links[i].fromJoint->a;
     }
 }
 
@@ -153,129 +146,352 @@ void SixDOF::forwardKinematics(double* angles)
         this->links[i].fromJoint->a = angles[i];
     }
 
-    Link endEffector = this->links[this->numLinks-2];
+    Link endEffector = this->links[this->numJoints-1];
     
     this->pose[0] = endEffector.H0[0][3];
     this->pose[1] = endEffector.H0[1][3];
     this->pose[2] = endEffector.H0[2][3];
 
-    this->bufferR[0][0] = endEffector.H0[0][0]; this->bufferR[0][1] = endEffector.H0[0][1]; this->bufferR[0][2] = endEffector.H0[0][2];
-    this->bufferR[1][0] = endEffector.H0[1][0]; this->bufferR[1][1] = endEffector.H0[1][1]; this->bufferR[1][2] = endEffector.H0[1][2];
-    this->bufferR[2][0] = endEffector.H0[2][0]; this->bufferR[2][1] = endEffector.H0[2][1]; this->bufferR[2][2] = endEffector.H0[2][2];
+    mtx_type* bufferR = new mtx_type[3*3];
+    mtx_type* bufferV = new mtx_type[3];
+
+    bufferR[3*0+0] = endEffector.H0[0][0]; bufferR[3*0+1] = endEffector.H0[0][1]; bufferR[3*0+2] = endEffector.H0[0][2];
+    bufferR[3*1+0] = endEffector.H0[1][0]; bufferR[3*1+1] = endEffector.H0[1][1]; bufferR[3*1+2] = endEffector.H0[1][2];
+    bufferR[3*2+0] = endEffector.H0[2][0]; bufferR[3*2+1] = endEffector.H0[2][1]; bufferR[3*2+2] = endEffector.H0[2][2];
     
     rot2euler((mtx_type*)bufferR, (mtx_type*)bufferV);
     this->pose[3] = bufferV[0];
     this->pose[4] = bufferV[1];
     this->pose[5] = bufferV[2];
+
+    delete[] bufferR;
+    delete[] bufferV;
 }
 
-////////////////////////////////////////// KINEMATIC DECOUPLING, IS IT POSSIBLE FOR N DOF? //////////////////////////////////////////
-/*
-SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double phi, double theta, double psi, double alpha)
+
+
+SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double phi, double theta, double psi, double grippingOffset, double alpha)
 {
-    int wristCenter = this->numJoints-2;
+
+    bool failed = false;
+    double* dAngles = new double[this->numJoints];
+    mtx_type* bufferV = new mtx_type[3];
+    mtx_type* bufferU = new mtx_type[3];
+    mtx_type* bufferW = new mtx_type[3];
+    mtx_type* bufferR = new mtx_type[3*3];
+    mtx_type* oc = new mtx_type[3];
+
+    for (int i = 0; i < this->numJoints; i++) dAngles[i] = 0;
+        
+    int wristCenter = this->numJoints-1;
     for (int i = this->numJoints-2; i > 0; i--)
     {
-        if (this->links[i].length != 0) {
+        if (this->links[i].length == 0) {
           wristCenter = i; 
           break;
         }
     }
 
-    this->bufferV[0] = x; 
-    this->bufferV[1] = y; 
-    this->bufferV[2] = z; 
-
-    this->bufferU[0] = 0; 
-    this->bufferU[1] = 0; 
-    this->bufferU[2] = 1; 
-
-    rotX(phi, (mtx_type*)this->bufferR3);
-    rotY(theta, (mtx_type*)this->bufferR3);
-    rotZ(psi, (mtx_type*)this->bufferR3);
-
-    Matrix.Multiply((mtx_type*)this->bufferR3, (mtx_type*)this->bufferU, 3, 3, 1, (mtx_type*)this->bufferW);
-    Matrix.Scale((mtx_type*)this->bufferW, 3, 1, this->links[this->numJoints-1].length);
-    Matrix.Subtract((mtx_type*)this->bufferV, (mtx_type*)this->bufferW, 3, 1, (mtx_type*)this->oc);
-
-    this->bufferV[0] = this->links[wristCenter].fromJoint->x;
-    this->bufferV[1] = this->links[wristCenter].fromJoint->y;
-    this->bufferV[2] = this->links[wristCenter].fromJoint->z;
-
-    double baseRotation = atan2(y,x);
-
-    int numSolve = wristCenter-1;
-    mtx_type* Jv = (mtx_type*)malloc(3 * numSolve * sizeof(mtx_type));
-    mtx_type* JvT = (mtx_type*)malloc(3 * numSolve * sizeof(mtx_type));
-    mtx_type* invJv = (mtx_type*)malloc(numSolve * numSolve * sizeof(mtx_type));
-    mtx_type* pinvJv = (mtx_type*)malloc(3 * numSolve * sizeof(mtx_type));
-
-    Link wristCenterLink = this->links[numSolve];
-
-    //// WHILE...
-    for (int i = 1; i < wristCenter; i++)
+    int hasThirdOrientationJoint = 0;
+    for (int i = wristCenter-1; i > 0; i--)
     {
-        numSolve++;
-        computeJointJacobian((mtx_type*)wristCenterLink.H0, (mtx_type*)this->links[i-1].H0, (mtx_type*)this->links[i].fromJoint->J);
-        Jv[numSolve * 0 + i] = this->links[i].fromJoint->J[0];
-        Jv[numSolve * 1 + i] = this->links[i].fromJoint->J[1];
-        Jv[numSolve * 2 + i] = this->links[i].fromJoint->J[2];
+        if (this->links[i].length == 0) {
+          hasThirdOrientationJoint = 1; 
+          break;
+        }
     }
 
-    Matrix.Transpose((mtx_type*)Jv, 3, numSolve, (mtx_type*)JvT);
-    Matrix.Multiply((mtx_type*)JvT, (mtx_type*)Jv, numSolve, 3, numSolve, (mtx_type*)invJv);
+
+    bufferV[0] = x; 
+    bufferV[1] = y; 
+    bufferV[2] = z; 
+
+    bufferU[0] = 0; 
+    bufferU[1] = 0; 
+    bufferU[2] = 1; 
+
+    bufferW[0] = phi; 
+    bufferW[1] = theta; 
+    bufferW[2] = psi; 
+
+    euler2rot((mtx_type*)bufferW, (mtx_type*)bufferR);
+    Matrix.Print((mtx_type*)bufferR, 3, 3, "bufferR");
+
+    Matrix.Multiply((mtx_type*)bufferR, (mtx_type*)bufferU, 3, 3, 1, (mtx_type*)bufferW);
+    Matrix.Scale((mtx_type*)bufferW, 3, 1, this->links[this->numJoints-1].length+grippingOffset);
+    Matrix.Subtract((mtx_type*)bufferV, (mtx_type*)bufferW, 3, 1, (mtx_type*)oc);
+
+    Matrix.Multiply((mtx_type*)bufferR, (mtx_type*)bufferU, 3, 3, 1, (mtx_type*)bufferW);
+    Matrix.Scale((mtx_type*)bufferW, 3, 1, grippingOffset);
+    Matrix.Subtract((mtx_type*)bufferV, (mtx_type*)bufferW, 3, 1, (mtx_type*)bufferU);
+
+    x = bufferU[0];
+    y = bufferU[1];
+    z = bufferU[2];
+
+    Matrix.Print((mtx_type*)oc, 3, 1, "oc");
+
+    int numSolve = wristCenter;
     
-    int success = Matrix.Invert((mtx_type*)invJv, numSolve);
-    if (success == 0) {
-      free(Jv);
-      free(JvT);
-      free(invJv);
-      free(pinvJv);
+    // USE ITERATIVE METHOD TO SOLVE WRIST POSITION
+
+    bufferV[0] = 0; 
+    bufferV[1] = 0; 
+    bufferV[2] = 0; 
+    
+    bufferU[0] = this->links[wristCenter-1].fromJoint->x;
+    bufferU[1] = this->links[wristCenter-1].fromJoint->y;
+    bufferU[2] = this->links[wristCenter-1].fromJoint->z;
+    
+    // Wrist center to Dest
+    double b = vecDistance((mtx_type*)bufferU, (mtx_type*)oc);
+    
+    int* positionUpdateDir = new int[numSolve-1];
+    for (int i = 0; i < numSolve; i++) {
+        positionUpdateDir[i] = -b/fabs(b);
+    }
+
+    Serial.println("POSITION ---------------------");
+    unsigned long time = millis();
+    
+    double prevB = b;
+    int index = 0;
+    int count = 0;
+    while (b > REACHED_DESTINATION_THRESHOLD && count++ < INVKIN_TIMEOUT) 
+    {
+        Serial.println(b);
+        //gamma = (a*a+b*b+c*c)/(2*a*b);
+        dAngles[index] = this->links[index].fromJoint->a + (alpha*fabs(b) + ((double)random(1000))/10000)*positionUpdateDir[index];
+
+        forwardKinematics(dAngles);
+        
+        bufferU[0] = this->links[wristCenter-1].fromJoint->x;
+        bufferU[1] = this->links[wristCenter-1].fromJoint->y;
+        bufferU[2] = this->links[wristCenter-1].fromJoint->z;
+
+        //Matrix.Print((mtx_type*)this->bufferU, 3, 1, "bufferU");
+            
+        // End effector to Dest
+        b = vecDistance((mtx_type*)bufferU, (mtx_type*)oc);
+
+        if (b <= prevB) {
+            if (index == numSolve-hasThirdOrientationJoint-1) 
+                index = 0;
+            else
+                index++;
+        } else {
+            positionUpdateDir[index] = -positionUpdateDir[index];
+        }
+        
+        prevB = b;
+/*
+        Serial.print(b);
+        Serial.print(":\t");
+        Serial.print(this->bufferU[0]);
+        Serial.print(" --> ");
+        Serial.print(this->oc[0]);
+        Serial.print("\t");
+        Serial.print(this->bufferU[1]);
+        Serial.print(" --> ");
+        Serial.print(this->oc[1]);
+        Serial.print("\t");
+        Serial.print(this->bufferU[2]);
+        Serial.print(" --> ");
+        Serial.print(this->oc[2]);
+        Serial.println();*/
+/*
+        Serial.print(this->dAngles[0]);
+        Serial.print("\t");
+        Serial.print(this->dAngles[1]);
+        Serial.print("\t");
+        Serial.print(this->dAngles[2]);
+        Serial.print("\t");
+        Serial.println(this->dAngles[3]);*/
+    }
+
+    if (count > INVKIN_TIMEOUT) failed = true;
+    
+    forwardKinematics((double*)dAngles);
+
+    delete[] positionUpdateDir;
+
+    time = millis() - time;
+    Serial.print("TIME ELAPSED: ");Serial.print(time);Serial.println(" ms");
+    Serial.print("UNCERTAINTY: ");Serial.println(b);
+    
+    ///////////////////////
+    // USE ITERATIVE METHOD TO SOLVE ORIENTATION
+
+    bufferU[0] = x; 
+    bufferU[1] = y; 
+    bufferU[2] = z; 
+    
+    bufferV[0] = this->pose[0];
+    bufferV[1] = this->pose[1];
+    bufferV[2] = this->pose[2];
+    
+    // End effector to Dest
+    b = vecDistance((mtx_type*)bufferV, (mtx_type*)bufferU);
+    
+    int* orientationUpdateDir = new int[this->numJoints-numSolve-1];
+    for (int i = 0; i < this->numJoints-numSolve; i++) {
+        orientationUpdateDir[i] = b/fabs(b);
+    }
+
+    Serial.println("ORIENTATION ---------------------");
+    time = millis();
+
+    prevB = b;
+    index = numSolve-hasThirdOrientationJoint;
+    count = 0;
+    while (b > REACHED_DESTINATION_THRESHOLD && count++ < INVKIN_TIMEOUT) 
+    {
+        Serial.println(b);
+        //gamma = (a*a+b*b+c*c)/(2*a*b);
+        dAngles[index] = this->links[index].fromJoint->a + (alpha*fabs(b))*orientationUpdateDir[index-numSolve];
+
+        forwardKinematics((double*)dAngles);
+        
+        bufferV[0] = this->pose[0];
+        bufferV[1] = this->pose[1];
+        bufferV[2] = this->pose[2];
+            
+        // End effector to Dest
+        b = vecDistance((mtx_type*)bufferV, (mtx_type*)bufferU);
+    
+        if (b <= prevB) {
+            if (index == this->numJoints-1) 
+                index = numSolve-hasThirdOrientationJoint;
+            else
+                index++;
+        } else {
+            orientationUpdateDir[index-numSolve] = -orientationUpdateDir[index-numSolve];
+        }
+        
+        prevB = b;
+/*
+        Serial.print(b);
+        Serial.print(":\t");
+        Serial.print(this->pose[0]);
+        Serial.print(" --> ");
+        Serial.print(x);
+        Serial.print("\t");
+        Serial.print(this->pose[1]);
+        Serial.print(" --> ");
+        Serial.print(y);
+        Serial.print("\t");
+        Serial.print(this->pose[2]);
+        Serial.print(" --> ");
+        Serial.print(z);
+        Serial.println();*/
+    }
+
+    if (count > INVKIN_TIMEOUT) failed = true;
+    
+    forwardKinematics((double*)dAngles);
+    time = millis() - time;
+    Serial.print("TIME ELAPSED: ");Serial.print(time);Serial.println(" ms");
+    Serial.print("UNCERTAINTY: ");Serial.println(b);
+    
+    bufferU[0] = this->links[this->numJoints-1].H0[0][1];
+    bufferU[1] = this->links[this->numJoints-1].H0[1][1];
+    bufferU[2] = this->links[this->numJoints-1].H0[2][1];
+
+    bufferV[0] = bufferR[3*0+1]; 
+    bufferV[1] = bufferR[3*1+1];
+    bufferV[2] = bufferR[3*2+1]; 
+
+    // End effector to Dest
+    b = angleDiff((mtx_type*)bufferU, (mtx_type*)bufferV);
+    
+    int updateDir = b/fabs(b);
+
+    Serial.println("ORIENTATION ADJUST ---------------------");
+    time = millis();
+
+    prevB = b;
+    index = this->numJoints-1;
+    int countSame = 0;
+    count = 0;
+    while (b > REACHED_DESTINATION_THRESHOLD && count++ < INVKIN_TIMEOUT) 
+    {
+        Serial.println(b);
+        //gamma = (a*a+b*b+c*c)/(2*a*b);
+        dAngles[index] = this->links[index].fromJoint->a + (alpha*fabs(b))*updateDir;
+
+        forwardKinematics((double*)dAngles);
+        
+        bufferU[0] = this->links[this->numJoints-1].H0[0][2];
+        bufferU[1] = this->links[this->numJoints-1].H0[1][2];
+        bufferU[2] = this->links[this->numJoints-1].H0[2][2];
+            
+        // End effector to Dest
+        b = angleDiff((mtx_type*)bufferU, (mtx_type*)bufferV);
+    
+        if (b > prevB) {
+            updateDir = -updateDir;
+            //b = b/2;
+        }
+        
+        if (int(b*1000)/10 == int(prevB*1000)/10) {
+          countSame++;
+          if (countSame > 10) break;
+        }
+        
+        prevB = b;
+/*
+        Serial.print(b);
+        Serial.print(":\t");
+        Serial.print(this->pose[3]);
+        Serial.print(" --> ");
+        Serial.print(phi);
+        Serial.print("\t");
+        Serial.print(this->pose[4]);
+        Serial.print(" --> ");
+        Serial.print(theta);
+        Serial.print("\t");
+        Serial.print(this->pose[5]);
+        Serial.print(" --> ");
+        Serial.print(psi);
+        Serial.println();
+
+        */
+    }
+
+    if (count > INVKIN_TIMEOUT) failed = true;
+
+    dAngles[this->numJoints-1] = fmod(dAngles[this->numJoints-1]-PI/2, 2*PI);
+    
+    forwardKinematics((double*)dAngles);
+    time = millis() - time;
+    Serial.print("TIME ELAPSED: ");Serial.print(time);Serial.println(" ms");
+    Serial.print("UNCERTAINTY: ");Serial.println(b);
+
+    delete[] orientationUpdateDir;
+    delete[] dAngles;
+    delete[] bufferV;
+    delete[] bufferU;
+    delete[] bufferW;
+    delete[] bufferR;
+    delete[] oc;
+
+    if (failed == false) {
+      Serial.println("SUCCESS!");
+      this->ikStatus = SUCCESS;
+      return SUCCESS;
+    } else {
+      Serial.println("FAIL!");
       this->ikStatus = FAILED;
       return FAILED;
     }
 
-    Matrix.Multiply((mtx_type*)invJv, (mtx_type*)JvT, numSolve, numSolve, 3, (mtx_type*)pinvJv);
-    
-    double SEDistance = vecDistance((mtx_type*)this->bufferV, (mtx_type*)this->oc);
-    Matrix.Subtract((mtx_type*)this->oc, (mtx_type*)this->bufferV, 3, 1, (mtx_type*)this->bufferU);
-
-    mtx_type* diffAngles = (mtx_type*)malloc(numSolve * sizeof(mtx_type));
-    Matrix.Multiply((mtx_type*)pinvJv, (mtx_type*)this->bufferU, numSolve, 3, 1, (mtx_type*)diffAngles);
-
-    mtx_type* newAngles = (mtx_type*)malloc((numSolve+1) * sizeof(mtx_type));
-    newAngles[0] = baseRotation;
-    for (int i = 1; i < numSolve; i++)
-    {
-        newAngles[i] = this->links[i+1].fromJoint->a + alpha*diffAngles[i];
-    }
-    
-    forwardKinematics((double*)newAngles, numSolve+1);
-
-    wristCenterLink = this->links[numSolve];
-    this->bufferR[0][0] = wristCenterLink.H0[0][0]; this->bufferR[0][1] = wristCenterLink.H0[0][1]; this->bufferR[0][2] = wristCenterLink.H0[0][2];
-    this->bufferR[1][0] = wristCenterLink.H0[1][0]; this->bufferR[1][1] = wristCenterLink.H0[1][1]; this->bufferR[1][2] = wristCenterLink.H0[1][2];
-    this->bufferR[2][0] = wristCenterLink.H0[2][0]; this->bufferR[2][1] = wristCenterLink.H0[2][1]; this->bufferR[2][2] = wristCenterLink.H0[2][2];
-
-    if (SEDistance <= REACHED_DESTINATION_THRESHOLD) {
-      this->ikStatus = DEST_REACHED;
-      return DEST_REACHED; 
-    }
-
-    free(diffAngles);
-    free(newAngles);
-    free(Jv);
-    free(JvT);
-    free(invJv);
-    free(pinvJv);
-    this->ikStatus = SUCCESS;
-    return SUCCESS;
+    Serial.println("???");
 }
-*/
+
 
 //////////////////////////////////////////
 
-
+/*
 SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double phi, double theta, double psi, double alpha)
 {
     Link endEffector = this->links[this->numLinks-2];
@@ -398,7 +614,7 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
             this->dAngles[i] = this->links[i].fromJoint->a + alpha*this->dAngles[i];
         }
         
-        forwardKinematics((double*)this->dAngles);
+        forwardKinematics((double*)dAngles);
 
         if (SEDistance <= REACHED_DESTINATION_THRESHOLD) {
           this->ikStatus = DEST_REACHED;
@@ -412,8 +628,7 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
 
     this->ikStatus = SUCCESS;
     return SUCCESS;
-}
-
+}*/
 SixDOF::IKState_t SixDOF::getIKStatus()
 {
   return this->ikStatus;
@@ -427,28 +642,38 @@ void SixDOF::computeDH(double theta, double d, double alpha, double a, mtx_type*
 
 void SixDOF::computeJointJacobian(mtx_type* endH, mtx_type* prevH, mtx_type* J) 
 {
-    // m rows, n cols
+    mtx_type* zPrev = new mtx_type[3];
+    mtx_type* oPrev = new mtx_type[3];
+    mtx_type* oEnd  = new mtx_type[3];
+    mtx_type* bufferV  = new mtx_type[3];
+    mtx_type* bufferU  = new mtx_type[3];
     
-    this->zPrev[0] = prevH[4 * 0 + 2];
-    this->zPrev[1] = prevH[4 * 1 + 2];
-    this->zPrev[2] = prevH[4 * 2 + 2];
+    zPrev[0] = prevH[4 * 0 + 2];
+    zPrev[1] = prevH[4 * 1 + 2];
+    zPrev[2] = prevH[4 * 2 + 2];
     
-    this->oPrev[0] = prevH[4 * 0 + 3];
-    this->oPrev[1] = prevH[4 * 1 + 3];
-    this->oPrev[2] = prevH[4 * 2 + 3];
+    oPrev[0] = prevH[4 * 0 + 3];
+    oPrev[1] = prevH[4 * 1 + 3];
+    oPrev[2] = prevH[4 * 2 + 3];
     
-    this->oEnd[0] = endH[4 * 0 + 3];
-    this->oEnd[1] = endH[4 * 1 + 3];
-    this->oEnd[2] = endH[4 * 2 + 3];
+    oEnd[0] = endH[4 * 0 + 3];
+    oEnd[1] = endH[4 * 1 + 3];
+    oEnd[2] = endH[4 * 2 + 3];
 
-    Matrix.Subtract((mtx_type*)this->oEnd, (mtx_type*)this->oPrev, 3, 1, (mtx_type*)this->bufferU);
-    crossProduct(this->zPrev, this->bufferU, this->bufferV);
-    J[0] = this->bufferV[0];
-    J[1] = this->bufferV[1];
-    J[2] = this->bufferV[2];
-    J[3] = this->zPrev[0];
-    J[4] = this->zPrev[1];
-    J[5] = this->zPrev[2];
+    Matrix.Subtract((mtx_type*)oEnd, (mtx_type*)oPrev, 3, 1, (mtx_type*)bufferU);
+    crossProduct(zPrev, bufferU, bufferV);
+    J[0] = bufferV[0];
+    J[1] = bufferV[1];
+    J[2] = bufferV[2];
+    J[3] = zPrev[0];
+    J[4] = zPrev[1];
+    J[5] = zPrev[2];
+
+    delete[] bufferU;
+    delete[] bufferV;
+    delete[] zPrev;
+    delete[] oPrev;
+    delete[] oEnd;
 }
 
 void SixDOF::screwZ(double theta, double d, mtx_type* H)
@@ -456,13 +681,18 @@ void SixDOF::screwZ(double theta, double d, mtx_type* H)
     double c=cos(theta);
     double s=sin(theta);
 
-    this->bufferH[0][0] = c;  this->bufferH[0][1] = -s; this->bufferH[0][2] = 0; this->bufferH[0][3] = 0;
-    this->bufferH[1][0] = s; this->bufferH[1][1] = c; this->bufferH[1][2] = 0; this->bufferH[1][3] = 0;
-    this->bufferH[2][0] = 0;  this->bufferH[2][1] = 0; this->bufferH[2][2] = 1; this->bufferH[2][3] = d;
-    this->bufferH[3][0] = 0;  this->bufferH[3][1] = 0; this->bufferH[3][2] = 0; this->bufferH[3][3] = 1;
+    mtx_type* bufferH = new mtx_type[4*4];
+    mtx_type* bufferH2 = new mtx_type[4*4];
+
+    bufferH[4*0+0] = c;  bufferH[4*0+1] = -s; bufferH[4*0+2] = 0; bufferH[4*0+3] = 0;
+    bufferH[4*1+0] = s;  bufferH[4*1+1] = c;  bufferH[4*1+2] = 0; bufferH[4*1+3] = 0;
+    bufferH[4*2+0] = 0;  bufferH[4*2+1] = 0;  bufferH[4*2+2] = 1; bufferH[4*2+3] = d;
+    bufferH[4*3+0] = 0;  bufferH[4*3+1] = 0;  bufferH[4*3+2] = 0; bufferH[4*3+3] = 1;
     
-    Matrix.Multiply((mtx_type*)H, (mtx_type*)this->bufferH, 4, 4, 4, (mtx_type*)this->bufferH2);
-    Matrix.Copy((mtx_type*)this->bufferH2, 4, 4, (mtx_type*)H);
+    Matrix.Multiply((mtx_type*)H, (mtx_type*)bufferH, 4, 4, 4, (mtx_type*)bufferH2);
+    Matrix.Copy((mtx_type*)bufferH2, 4, 4, (mtx_type*)H);
+    delete[] bufferH;
+    delete[] bufferH2;
 }
 
 void SixDOF::screwX(double alpha, double a, mtx_type* H)
@@ -470,13 +700,18 @@ void SixDOF::screwX(double alpha, double a, mtx_type* H)
     double c=cos(alpha);
     double s=sin(alpha);
 
-    this->bufferH[0][0] = 1; this->bufferH[0][1] = 0; this->bufferH[0][2] = 0;  this->bufferH[0][3] = a;
-    this->bufferH[1][0] = 0; this->bufferH[1][1] = c; this->bufferH[1][2] = -s; this->bufferH[1][3] = 0;
-    this->bufferH[2][0] = 0; this->bufferH[2][1] = s; this->bufferH[2][2] = c;  this->bufferH[2][3] = 0;
-    this->bufferH[3][0] = 0; this->bufferH[3][1] = 0; this->bufferH[3][2] = 0;  this->bufferH[3][3] = 1;
+    mtx_type* bufferH = new mtx_type[4*4];
+    mtx_type* bufferH2 = new mtx_type[4*4];
+
+    bufferH[4*0+0] = 1;  bufferH[4*0+1] = 0;  bufferH[4*0+2] = 0;  bufferH[4*0+3] = a;
+    bufferH[4*1+0] = 0;  bufferH[4*1+1] = c;  bufferH[4*1+2] = -s; bufferH[4*1+3] = 0;
+    bufferH[4*2+0] = 0;  bufferH[4*2+1] = s;  bufferH[4*2+2] = c;  bufferH[4*2+3] = 0;
+    bufferH[4*3+0] = 0;  bufferH[4*3+1] = 0;  bufferH[4*3+2] = 0;  bufferH[4*3+3] = 1;
     
-    Matrix.Multiply((mtx_type*)H, (mtx_type*)this->bufferH, 4, 4, 4, (mtx_type*)this->bufferH2);
-    Matrix.Copy((mtx_type*)this->bufferH2, 4, 4, (mtx_type*)H);
+    Matrix.Multiply((mtx_type*)H, (mtx_type*)bufferH, 4, 4, 4, (mtx_type*)bufferH2);
+    Matrix.Copy((mtx_type*)bufferH2, 4, 4, (mtx_type*)H);
+    delete[] bufferH;
+    delete[] bufferH2;
 }
 
 void SixDOF::crossProduct(mtx_type* v, mtx_type* u, mtx_type* w) 
@@ -488,9 +723,11 @@ void SixDOF::crossProduct(mtx_type* v, mtx_type* u, mtx_type* w)
     Matrix.Scale((mtx_type*)this->v_i, 3, 1, jk);
     Matrix.Scale((mtx_type*)this->v_j, 3, 1, ik);
     Matrix.Scale((mtx_type*)this->v_k, 3, 1, ij);
+
+    mtx_type* bufferV = new mtx_type[3];
     
-    Matrix.Subtract((mtx_type*)this->v_i, (mtx_type*)this->v_j, 3, 1, (mtx_type*)this->bufferV);
-    Matrix.Add((mtx_type*)this->bufferV, (mtx_type*)this->v_k, 3, 1, (mtx_type*)w);
+    Matrix.Subtract((mtx_type*)this->v_i, (mtx_type*)this->v_j, 3, 1, (mtx_type*)bufferV);
+    Matrix.Add((mtx_type*)bufferV, (mtx_type*)this->v_k, 3, 1, (mtx_type*)w);
 
     this->v_i[0] = 1;
     this->v_i[1] = 0;
@@ -501,19 +738,29 @@ void SixDOF::crossProduct(mtx_type* v, mtx_type* u, mtx_type* w)
     this->v_k[0] = 0;
     this->v_k[1] = 0;
     this->v_k[2] = 1;
+
+    delete[] bufferV;
 }
 
 
 double SixDOF::angleDiff(mtx_type* v, mtx_type* u)
 {
-    double dotProd = v[0]*u[0] + v[1]*u[1] + v[2]*u[2];
+    /*double dotProd = v[0]*u[0] + v[1]*u[1] + v[2]*u[2];
     double normV = sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
     double normU = sqrt(u[0]*u[0] + u[1]*u[1] + u[2]*u[2]);
     
     double c_ang = dotProd/(normV*normU);
     double s_ang = sqrt(1-c_ang*c_ang);
     
-    return atan2(s_ang, c_ang);
+    return atan2(s_ang, c_ang);*/
+
+    mtx_type* w = new mtx_type[3];
+    crossProduct((mtx_type*) v, (mtx_type*) u, (mtx_type*) w);
+    double normW = sqrt(w[0]*w[0] + w[1]*w[1] + w[2]*w[2]);
+    double normU = sqrt(u[0]*u[0] + u[1]*u[1] + u[2]*u[2]);
+    double normV = sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+    delete[] w;
+    return asin(normW/(normU*normV));
 } 
 
 
@@ -535,7 +782,7 @@ double SixDOF::determinant(mtx_type* M, int len)
   else if (len > 2) 
   {
       int splitSize = (int)sqrt(len*len-2*len+1);
-      mtx_type* temp_M = (mtx_type*)malloc(splitSize * splitSize * sizeof(mtx_type)); 
+      mtx_type* temp_M = new mtx_type[splitSize * splitSize];
       
       for (int i = 0; i < len; i++)
       {
@@ -560,7 +807,7 @@ double SixDOF::determinant(mtx_type* M, int len)
               det = det + (double)(M[len * 0 + i]*o*determinant((mtx_type*)temp_M, splitSize));
           }
       }
-      free((mtx_type*)temp_M);
+      delete[] temp_M;
   }
   return det;
 }
@@ -570,12 +817,17 @@ void SixDOF::rotZ(double theta, mtx_type* R)
     double c=cos(theta);
     double s=sin(theta);
 
-    this->bufferR[0][0] = c;  this->bufferR[0][1] = -s; this->bufferR[0][2] = 0;
-    this->bufferR[1][0] = s; this->bufferR[1][1] = c; this->bufferR[1][2] = 0;
-    this->bufferR[2][0] = 0;  this->bufferR[2][1] = 0; this->bufferR[2][2] = 1;
+    mtx_type* bufferR = new mtx_type[3*3];
+    mtx_type* result  = new mtx_type[3*3];
+
+    bufferR[3*0+0] = c;  bufferR[3*0+1] = -s; bufferR[3*0+2] = 0;
+    bufferR[3*1+0] = s;  bufferR[3*1+1] = c;  bufferR[3*1+2] = 0;
+    bufferR[3*2+0] = 0;  bufferR[3*2+1] = 0;  bufferR[3*2+2] = 1;
     
-    Matrix.Multiply((mtx_type*)R, (mtx_type*)this->bufferR, 3, 3, 3, (mtx_type*)this->bufferR2);
-    Matrix.Copy((mtx_type*)this->bufferR2, 3, 3, (mtx_type*)R);
+    Matrix.Multiply((mtx_type*)R, (mtx_type*)bufferR, 3, 3, 3, (mtx_type*)result);
+    Matrix.Copy((mtx_type*)result, 3, 3, (mtx_type*)R);
+    delete[] bufferR;
+    delete[] result;
 }
 
 void SixDOF::rotY(double phi, mtx_type* R)
@@ -583,12 +835,17 @@ void SixDOF::rotY(double phi, mtx_type* R)
     double c=cos(phi);
     double s=sin(phi);
 
-    this->bufferR[0][0] = c;   this->bufferR[0][1] = 0; this->bufferR[0][2] = s;
-    this->bufferR[1][0] = 0;   this->bufferR[1][1] = 1; this->bufferR[1][2] = 0;
-    this->bufferR[2][0] = -s;  this->bufferR[2][1] = 0; this->bufferR[2][2] = c;
+    mtx_type* bufferR = new mtx_type[3*3];
+    mtx_type* result  = new mtx_type[3*3];
+
+    bufferR[3*0+0] = c;  bufferR[3*0+1] = 0; bufferR[3*0+2] = s;
+    bufferR[3*1+0] = 0;  bufferR[3*1+1] = 1; bufferR[3*1+2] = 0;
+    bufferR[3*2+0] = -s; bufferR[3*2+1] = 0; bufferR[3*2+2] = c;
     
-    Matrix.Multiply((mtx_type*)R, (mtx_type*)this->bufferR, 3, 3, 3, (mtx_type*)this->bufferR2);
-    Matrix.Copy((mtx_type*)this->bufferR2, 3, 3, (mtx_type*)R);
+    Matrix.Multiply((mtx_type*)R, (mtx_type*)bufferR, 3, 3, 3, (mtx_type*)result);
+    Matrix.Copy((mtx_type*)result, 3, 3, (mtx_type*)R);
+    delete[] bufferR;
+    delete[] result;
 }
 
 void SixDOF::rotX(double psi, mtx_type* R)
@@ -596,12 +853,17 @@ void SixDOF::rotX(double psi, mtx_type* R)
     double c=cos(psi);
     double s=sin(psi);
 
-    this->bufferR[0][0] = 1; this->bufferR[0][1] = 0; this->bufferR[0][2] = 0;
-    this->bufferR[1][0] = 0; this->bufferR[1][1] = c; this->bufferR[1][2] = -s;
-    this->bufferR[2][0] = 0; this->bufferR[2][1] = s; this->bufferR[2][2] = c;
+    mtx_type* bufferR = new mtx_type[3*3];
+    mtx_type* result  = new mtx_type[3*3];
+
+    bufferR[3*0+0] = 1; bufferR[3*0+1] = 0; bufferR[3*0+2] = 0;
+    bufferR[3*1+0] = 0; bufferR[3*1+1] = c; bufferR[3*1+2] = -s;
+    bufferR[3*2+0] = 0; bufferR[3*2+1] = s; bufferR[3*2+2] = c;
     
-    Matrix.Multiply((mtx_type*)R, (mtx_type*)this->bufferR, 3, 3, 3, (mtx_type*)this->bufferR2);
-    Matrix.Copy((mtx_type*)this->bufferR2, 3, 3, (mtx_type*)R);
+    Matrix.Multiply((mtx_type*)R, (mtx_type*)bufferR, 3, 3, 3, (mtx_type*)result);
+    Matrix.Copy((mtx_type*)result, 3, 3, (mtx_type*)R);
+    delete[] bufferR;
+    delete[] result;
 }
 
 
@@ -639,7 +901,7 @@ void SixDOF::euler2rot(mtx_type* euler, mtx_type* R)
     rotY(euler[1], R);
     rotZ(euler[2], R);
 }
-
+/*
 void SixDOF::euler2angvel(mtx_type* eulerFrom, mtx_type* eulerTo, mtx_type* angVel) 
 {
   euler2rot((mtx_type*)eulerFrom,(mtx_type*)this->bufferR3);
@@ -666,7 +928,7 @@ void SixDOF::euler2angvel(mtx_type* eulerFrom, mtx_type* eulerTo, mtx_type* angV
   this->bufferW[2] = -((this->bufferV[0]+this->bufferW[2])-(this->bufferU[2]+this->bufferW[2]));
 
   Matrix.Multiply((mtx_type*)this->bufferR2, (mtx_type*)this->bufferW, 3, 3, 1, (mtx_type*)angVel);
-}
+}*/
 
 //////////// ATTEMPT AT USING AXIS/ANGLE VECTORS INSTEAD OF EULER ANGLES /////////////////
 

@@ -30,7 +30,8 @@
 //#define TRANSPOSE_JACOBIAN_METHOD
 
 #define SINGULARITY_THRESHOLD 0.00001
-#define REACHED_DESTINATION_THRESHOLD 0.01
+#define REACHED_DESTINATION_THRESHOLD 0.005
+#define INVKIN_TIMEOUT 1000
 
 class SixDOF
 {
@@ -46,11 +47,8 @@ class SixDOF
     SixDOF(double* thetas, double* ds, double* alphas, double* as, int len);
     
     void forwardKinematics(double* angles);
-    //IKState_t inverseKinematics(double x, double y, double z, double ax, double ay, double az, double theta, double alpha);
+    IKState_t inverseKinematics(double x, double y, double z, double phi, double theta, double psi, double grippingOffset, double alpha);
 
-    IKState_t inverseKinematics(double x, double y, double z, double phi, double theta, double psi, double alpha);
-    //IKState_t inverseKinematics(double x, double y, double z, double phi, double theta, double psi);
-    
     void getPose(double* returnPose);
     void getJointAngles(double* returnAngles);
 
@@ -60,52 +58,17 @@ class SixDOF
   
     int numJoints = 6; // Defaults to 6
     int numLinks = 7; // Defaults to 7
-    
-    mtx_type bufferV[3];
-    mtx_type bufferU[3];
-    mtx_type bufferW[3];
-    mtx_type bufferX[3];
-    mtx_type bufferY[3];
-    mtx_type bufferZ[3];
-    mtx_type bufferH[4][4];
-    mtx_type bufferH2[4][4];
-    mtx_type bufferR[3][3];
-    mtx_type bufferR2[3][3];
-    mtx_type bufferR3[3][3];
-    mtx_type bufferR4[3][3];
-    mtx_type bufferR5[3][3];
-    
-    mtx_type bufferAX[4];
-    mtx_type bufferAY[4];
 
-    mtx_type oc[3];
-
-    mtx_type eye[4][4];
-    
-    // Manipulator Jacobian
-    mtx_type* J;
-    mtx_type* invJ;
-    mtx_type* bufferinvJ;
-    mtx_type* transposeJ;
-    mtx_type* bufferJ;
-
-    mtx_type bufferPose[6];
-    
     //Manipulator pose
     mtx_type pose[6];
-    mtx_type newPose[6];
-    
-    //Joint angle differences
-    mtx_type* dAngles;
 
     // Unit vectors
     mtx_type v_i[3];
     mtx_type v_j[3];
     mtx_type v_k[3];
 
-    mtx_type zPrev[3];
-    mtx_type oPrev[3];
-    mtx_type oEnd[3];
+    // Identity matrix
+    mtx_type eye[4][4];
 
     IKState_t ikStatus;
  
@@ -165,7 +128,7 @@ class SixDOF
    
     void rot2euler(mtx_type* R, mtx_type* euler);
     void euler2rot(mtx_type* euler, mtx_type* R);
-    void euler2angvel(mtx_type* eulerFrom, mtx_type* eulerTo, mtx_type* angVel);
+    //void euler2angvel(mtx_type* eulerFrom, mtx_type* eulerTo, mtx_type* angVel);
     
 };
 
