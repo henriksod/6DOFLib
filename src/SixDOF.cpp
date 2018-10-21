@@ -63,13 +63,6 @@ SixDOF::SixDOF(double* thetas, double* ds, double* alphas, double* as, int len)
     this->eye[1][0] = 0; this->eye[1][1] = 1; this->eye[1][2] = 0; this->eye[1][3] = 0;
     this->eye[2][0] = 0; this->eye[2][1] = 0; this->eye[2][2] = 1; this->eye[2][3] = 0;
     this->eye[3][0] = 0; this->eye[3][1] = 0; this->eye[3][2] = 0; this->eye[3][3] = 1;
-/*
-    this->J          = new mtx_type[6 * this->numJoints];
-    this->invJ       = new mtx_type[6 * this->numJoints];
-    this->bufferJ    = new mtx_type[6 * this->numJoints];
-    this->bufferinvJ = new mtx_type[this->numJoints * this->numJoints];
-    this->transposeJ = new mtx_type[6 * this->numJoints];
-    */
 
     this->pose[0] = 0;
     this->pose[1] = 0;
@@ -173,13 +166,13 @@ void SixDOF::forwardKinematics(double* angles)
 SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double phi, double theta, double psi, double grippingOffset, double alpha)
 {
 
-    bool failed = false;
-    double* dAngles = new double[this->numJoints];
+    bool failed       = false;
+    double* dAngles   = new double[this->numJoints];
     mtx_type* bufferV = new mtx_type[3];
     mtx_type* bufferU = new mtx_type[3];
     mtx_type* bufferW = new mtx_type[3];
     mtx_type* bufferR = new mtx_type[3*3];
-    mtx_type* oc = new mtx_type[3];
+    mtx_type* oc      = new mtx_type[3];
 
     for (int i = 0; i < this->numJoints; i++) dAngles[i] = 0;
         
@@ -460,7 +453,7 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
 
     if (count > INVKIN_TIMEOUT) failed = true;
 
-    dAngles[this->numJoints-1] = fmod(dAngles[this->numJoints-1]-PI/2, 2*PI);
+    dAngles[this->numJoints-1] = fmod(dAngles[this->numJoints-1], 2*PI);
     
     forwardKinematics((double*)dAngles);
     time = millis() - time;
