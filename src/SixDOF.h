@@ -48,6 +48,7 @@ class SixDOF
     
     void forwardKinematics(double* angles);
     IKState_t inverseKinematics(double x, double y, double z, double phi, double theta, double psi, double grippingOffset, double alpha);
+    IKState_t inverseKinematics2(double x, double y, double z, double phi, double theta, double psi, double grippingOffset, double alpha);
 
     void getPose(double* returnPose);
     void getJointAngles(double* returnAngles);
@@ -69,6 +70,7 @@ class SixDOF
 
     // Identity matrix
     mtx_type eye[4][4];
+    mtx_type eye3[3][3];
 
     IKState_t ikStatus;
  
@@ -105,6 +107,8 @@ class SixDOF
     
     // List of links that makes up the manipulator
     Link* links;
+
+    IKState_t inverseWristKinematics(double x, double y, double z, int wristCenter, double alpha);
     
     void computeDH(double theta, double d, double alpha, double a, mtx_type* H);
     void computeJointJacobian(mtx_type* endH, mtx_type* prevH, mtx_type* J);
@@ -113,14 +117,14 @@ class SixDOF
     void crossProduct(mtx_type* u, mtx_type* v, mtx_type* w);
     double angleDiff(mtx_type* v, mtx_type* u);
     double vecDistance(mtx_type* from, mtx_type* to);
+    double norm(mtx_type* v);
+    //double norm6(mtx_type* v);
+    double dot(mtx_type* u, mtx_type* v);
     double determinant(mtx_type* M, int len);
 
-    /*
     void rot2axis(mtx_type* R, mtx_type* ax);
-    void axis2rot(mtx_type* ax, mtx_type* R);
-    void eigDecomp(mtx_type* A, int m, int n, int iterations, mtx_type* out);
-    */
-
+    //void axis2rot(mtx_type* ax, mtx_type* R);
+    //void eigDecomp(mtx_type* A, int m, int n, int iterations, mtx_type* out);
     
     void rotZ(double theta, mtx_type* R);
     void rotY(double phi, mtx_type* R);
@@ -128,6 +132,10 @@ class SixDOF
    
     void rot2euler(mtx_type* R, mtx_type* euler);
     void euler2rot(mtx_type* euler, mtx_type* R);
+    void t2r(mtx_type* H, mtx_type* R);
+    double traceR(mtx_type* R);
+    double maxDiagR(mtx_type* R);
+    int maxDiagRCol(mtx_type* R);
     //void euler2angvel(mtx_type* eulerFrom, mtx_type* eulerTo, mtx_type* angVel);
     
 };

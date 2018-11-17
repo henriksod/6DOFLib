@@ -64,6 +64,11 @@ SixDOF::SixDOF(double* thetas, double* ds, double* alphas, double* as, int len)
     this->eye[2][0] = 0; this->eye[2][1] = 0; this->eye[2][2] = 1; this->eye[2][3] = 0;
     this->eye[3][0] = 0; this->eye[3][1] = 0; this->eye[3][2] = 0; this->eye[3][3] = 1;
 
+    this->eye3[0][0] = 1; this->eye3[0][1] = 0; this->eye3[0][2] = 0;
+    this->eye3[1][0] = 0; this->eye3[1][1] = 1; this->eye3[1][2] = 0;
+    this->eye3[2][0] = 0; this->eye3[2][1] = 0; this->eye3[2][2] = 1;
+
+
     this->pose[0] = 0;
     this->pose[1] = 0;
     this->pose[2] = 0;
@@ -82,6 +87,7 @@ SixDOF::SixDOF(double* thetas, double* ds, double* alphas, double* as, int len)
     this->v_k[2] = 1;
 
     this->ikStatus = SUCCESS;
+
 }
 
 void SixDOF::getPose(double* returnPose)
@@ -174,7 +180,7 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
     mtx_type* bufferR = new mtx_type[3*3];
     mtx_type* oc      = new mtx_type[3];
 
-    for (int i = 0; i < this->numJoints; i++) dAngles[i] = 0;
+    for (int i = 0; i < this->numJoints; i++){ dAngles[i] = 0; }
         
     int wristCenter = this->numJoints-1;
     for (int i = this->numJoints-2; i > 0; i--)
@@ -208,7 +214,7 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
     bufferW[2] = psi; 
 
     euler2rot((mtx_type*)bufferW, (mtx_type*)bufferR);
-    Matrix.Print((mtx_type*)bufferR, 3, 3, "bufferR");
+    //Matrix.Print((mtx_type*)bufferR, 3, 3, "bufferR");
 
     Matrix.Multiply((mtx_type*)bufferR, (mtx_type*)bufferU, 3, 3, 1, (mtx_type*)bufferW);
     Matrix.Scale((mtx_type*)bufferW, 3, 1, this->links[this->numJoints-1].length+grippingOffset);
@@ -222,16 +228,12 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
     y = bufferU[1];
     z = bufferU[2];
 
-    Matrix.Print((mtx_type*)oc, 3, 1, "oc");
+    //Matrix.Print((mtx_type*)oc, 3, 1, "oc");
 
     int numSolve = wristCenter;
     
     // USE ITERATIVE METHOD TO SOLVE WRIST POSITION
 
-    bufferV[0] = 0; 
-    bufferV[1] = 0; 
-    bufferV[2] = 0; 
-    
     bufferU[0] = this->links[wristCenter-1].fromJoint->x;
     bufferU[1] = this->links[wristCenter-1].fromJoint->y;
     bufferU[2] = this->links[wristCenter-1].fromJoint->z;
@@ -250,11 +252,18 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
     double prevB = b;
     int index = 0;
     int count = 0;
+    double alphaTemp = alpha;
     while (b > REACHED_DESTINATION_THRESHOLD && count++ < INVKIN_TIMEOUT) 
     {
-        Serial.println(b);
+        //Serial.print(b);
+        //Serial.print('\t');
+        //Serial.println(alpha);
         //gamma = (a*a+b*b+c*c)/(2*a*b);
-        dAngles[index] = this->links[index].fromJoint->a + (alpha*fabs(b) + ((double)random(1000))/10000)*positionUpdateDir[index];
+        
+        double randVal = ((double)random(100))/10000;
+        
+        dAngles[index] = dAngles[index] + (alpha*b*b + randVal)*positionUpdateDir[index];
+        alpha = alpha*0.999;
 
         forwardKinematics(dAngles);
         
@@ -277,29 +286,6 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
         }
         
         prevB = b;
-/*
-        Serial.print(b);
-        Serial.print(":\t");
-        Serial.print(this->bufferU[0]);
-        Serial.print(" --> ");
-        Serial.print(this->oc[0]);
-        Serial.print("\t");
-        Serial.print(this->bufferU[1]);
-        Serial.print(" --> ");
-        Serial.print(this->oc[1]);
-        Serial.print("\t");
-        Serial.print(this->bufferU[2]);
-        Serial.print(" --> ");
-        Serial.print(this->oc[2]);
-        Serial.println();*/
-/*
-        Serial.print(this->dAngles[0]);
-        Serial.print("\t");
-        Serial.print(this->dAngles[1]);
-        Serial.print("\t");
-        Serial.print(this->dAngles[2]);
-        Serial.print("\t");
-        Serial.println(this->dAngles[3]);*/
     }
 
     if (count > INVKIN_TIMEOUT) failed = true;
@@ -337,11 +323,16 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
     prevB = b;
     index = numSolve-hasThirdOrientationJoint;
     count = 0;
+    alpha = alphaTemp;
     while (b > REACHED_DESTINATION_THRESHOLD && count++ < INVKIN_TIMEOUT) 
     {
-        Serial.println(b);
+        //Serial.print(b);
+        //Serial.print('\t');
+        //Serial.println(alpha);
         //gamma = (a*a+b*b+c*c)/(2*a*b);
-        dAngles[index] = this->links[index].fromJoint->a + (alpha*fabs(b))*orientationUpdateDir[index-numSolve];
+        dAngles[index] = dAngles[index] + (alpha*fabs(b))*orientationUpdateDir[index-numSolve];
+        alpha = alpha*0.999;
+
 
         forwardKinematics((double*)dAngles);
         
@@ -362,21 +353,6 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
         }
         
         prevB = b;
-/*
-        Serial.print(b);
-        Serial.print(":\t");
-        Serial.print(this->pose[0]);
-        Serial.print(" --> ");
-        Serial.print(x);
-        Serial.print("\t");
-        Serial.print(this->pose[1]);
-        Serial.print(" --> ");
-        Serial.print(y);
-        Serial.print("\t");
-        Serial.print(this->pose[2]);
-        Serial.print(" --> ");
-        Serial.print(z);
-        Serial.println();*/
     }
 
     if (count > INVKIN_TIMEOUT) failed = true;
@@ -385,80 +361,47 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
     time = millis() - time;
     Serial.print("TIME ELAPSED: ");Serial.print(time);Serial.println(" ms");
     Serial.print("UNCERTAINTY: ");Serial.println(b);
-    
-    bufferU[0] = this->links[this->numJoints-1].H0[0][1];
-    bufferU[1] = this->links[this->numJoints-1].H0[1][1];
-    bufferU[2] = this->links[this->numJoints-1].H0[2][1];
-
-    bufferV[0] = bufferR[3*0+1]; 
-    bufferV[1] = bufferR[3*1+1];
-    bufferV[2] = bufferR[3*2+1]; 
-
-    // End effector to Dest
-    b = angleDiff((mtx_type*)bufferU, (mtx_type*)bufferV);
-    
-    int updateDir = b/fabs(b);
 
     Serial.println("ORIENTATION ADJUST ---------------------");
     time = millis();
 
-    prevB = b;
-    index = this->numJoints-1;
-    int countSame = 0;
-    count = 0;
-    while (b > REACHED_DESTINATION_THRESHOLD && count++ < INVKIN_TIMEOUT) 
-    {
-        Serial.println(b);
-        //gamma = (a*a+b*b+c*c)/(2*a*b);
-        dAngles[index] = this->links[index].fromJoint->a + (alpha*fabs(b))*updateDir;
+    int timeout = 0;
+    double optimalAngle = 0;
+    double bestError = 1000;
+    do {
+      bufferU[0] = this->links[this->numJoints-1].H0[0][1];
+      bufferU[1] = this->links[this->numJoints-1].H0[1][1];
+      bufferU[2] = this->links[this->numJoints-1].H0[2][1];
+  
+      bufferV[0] = bufferR[3*0+1]; 
+      bufferV[1] = bufferR[3*1+1];
+      bufferV[2] = bufferR[3*2+1]; 
+  
+      double sU = norm(bufferU);
+      double sV = norm(bufferV);
+      double cU = dot(bufferU, bufferV);
+      double error = acos(cU/(sV*sU));
+  
+      dAngles[this->numJoints-1] = dAngles[this->numJoints-1]-error*0.5;
+      if (error < bestError) {
+        bestError = error;
+        optimalAngle = dAngles[this->numJoints-1];
+        timeout = 0;
+      } else {
+        timeout++;
+      }
+      forwardKinematics((double*)dAngles);
+      //Serial.println(bestError);
+    } while (timeout < 10);
 
-        forwardKinematics((double*)dAngles);
-        
-        bufferU[0] = this->links[this->numJoints-1].H0[0][2];
-        bufferU[1] = this->links[this->numJoints-1].H0[1][2];
-        bufferU[2] = this->links[this->numJoints-1].H0[2][2];
-            
-        // End effector to Dest
-        b = angleDiff((mtx_type*)bufferU, (mtx_type*)bufferV);
+    dAngles[this->numJoints-1] = optimalAngle;
     
-        if (b > prevB) {
-            updateDir = -updateDir;
-            //b = b/2;
-        }
-        
-        if (int(b*1000)/10 == int(prevB*1000)/10) {
-          countSame++;
-          if (countSame > 10) break;
-        }
-        
-        prevB = b;
-/*
-        Serial.print(b);
-        Serial.print(":\t");
-        Serial.print(this->pose[3]);
-        Serial.print(" --> ");
-        Serial.print(phi);
-        Serial.print("\t");
-        Serial.print(this->pose[4]);
-        Serial.print(" --> ");
-        Serial.print(theta);
-        Serial.print("\t");
-        Serial.print(this->pose[5]);
-        Serial.print(" --> ");
-        Serial.print(psi);
-        Serial.println();
-
-        */
-    }
-
-    if (count > INVKIN_TIMEOUT) failed = true;
-
-    dAngles[this->numJoints-1] = fmod(dAngles[this->numJoints-1], 2*PI);
+    for (int i = 0; i < this->numJoints; i++) dAngles[i] = fmod(dAngles[i], 2*PI);
     
     forwardKinematics((double*)dAngles);
     time = millis() - time;
     Serial.print("TIME ELAPSED: ");Serial.print(time);Serial.println(" ms");
-    Serial.print("UNCERTAINTY: ");Serial.println(b);
+    Serial.print("UNCERTAINTY: ");Serial.println(bestError);
 
     delete[] orientationUpdateDir;
     delete[] dAngles;
@@ -477,151 +420,135 @@ SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double
       this->ikStatus = FAILED;
       return FAILED;
     }
-
-    Serial.println("???");
 }
 
+SixDOF::IKState_t SixDOF::inverseKinematics2(double x, double y, double z, double phi, double theta, double psi, double grippingOffset, double alpha)
+{
+    mtx_type* dAngles   = new mtx_type[this->numJoints];
+    mtx_type* error = new mtx_type[6];
+    mtx_type* bufferAxis = new mtx_type[4];
+    mtx_type* bufferV = new mtx_type[3];
+    mtx_type* bufferR = new mtx_type[3*3];
+    mtx_type* bufferR2 = new mtx_type[3*3];
+    mtx_type* bufferR3 = new mtx_type[3*3];
+    mtx_type* oc = new mtx_type[3];
+    mtx_type* J = new mtx_type[this->numJoints*6];
+    mtx_type* transposeJ = new mtx_type[this->numJoints*6];
+    mtx_type* bufferinvJ = new mtx_type[this->numJoints*this->numJoints];
+    mtx_type* invJ = new mtx_type[this->numJoints*6];
+
+    for (int i = 0; i < this->numJoints; i++) dAngles[i] = 0;
+
+    bufferV[0] = phi; 
+    bufferV[1] = theta; 
+    bufferV[2] = psi; 
+
+    euler2rot((mtx_type*)bufferV, (mtx_type*)bufferR);
+
+    this->ikStatus = SUCCESS;
+
+    while(true)
+    {
+
+      Link endEffector = this->links[this->numJoints-1];
+
+      error[0] = x-endEffector.H0[0][3];
+      error[1] = y-endEffector.H0[1][3];
+      error[2] = z-endEffector.H0[2][3];
+
+      t2r((mtx_type*)this->links[this->numJoints-1].H0,(mtx_type*)bufferR2);
+
+      Matrix.Transpose((mtx_type*)bufferR2, 3, 3, (mtx_type*)bufferR3);
+      Matrix.Multiply((mtx_type*)bufferR3, (mtx_type*)bufferR, 3, 3, 3, (mtx_type*)bufferR2);
+      
+      rot2axis(bufferR2, bufferAxis);
+      error[3] = bufferAxis[0]*bufferAxis[3];
+      error[4] = bufferAxis[1]*bufferAxis[3];
+      error[5] = bufferAxis[2]*bufferAxis[3];
+
+      computeJointJacobian((mtx_type*)endEffector.H0, (mtx_type*)this->eye, (mtx_type*)this->links[0].fromJoint->J);
+      J[this->numJoints * 0 + 0] = this->links[0].fromJoint->J[0];
+      J[this->numJoints * 1 + 0] = this->links[0].fromJoint->J[1];
+      J[this->numJoints * 2 + 0] = this->links[0].fromJoint->J[2];
+      J[this->numJoints * 3 + 0] = this->links[0].fromJoint->J[3];
+      J[this->numJoints * 4 + 0] = this->links[0].fromJoint->J[4];
+      J[this->numJoints * 5 + 0] = this->links[0].fromJoint->J[5];
+      
+      for (int i = 1; i < this->numJoints; i++)
+      {
+          computeJointJacobian((mtx_type*)endEffector.H0, (mtx_type*)this->links[i-1].H0, (mtx_type*)this->links[i].fromJoint->J);
+          
+          J[this->numJoints * 0 + i] = this->links[i].fromJoint->J[0];
+          J[this->numJoints * 1 + i] = this->links[i].fromJoint->J[1];
+          J[this->numJoints * 2 + i] = this->links[i].fromJoint->J[2];
+          J[this->numJoints * 3 + i] = this->links[i].fromJoint->J[3];
+          J[this->numJoints * 4 + i] = this->links[i].fromJoint->J[4];
+          J[this->numJoints * 5 + i] = this->links[i].fromJoint->J[5];
+      }
+
+      //Matrix.Print((mtx_type*)J, 6, this->numJoints, "J");
+
+      Matrix.Transpose((mtx_type*)J, 6, this->numJoints, (mtx_type*)transposeJ);
+      Matrix.Multiply((mtx_type*)transposeJ, (mtx_type*)J, this->numJoints, 6, this->numJoints, (mtx_type*)bufferinvJ);
+      
+      int success = Matrix.Invert((mtx_type*)bufferinvJ, this->numJoints);
+      if (success == 0) {
+        this->ikStatus = FAILED;
+        break;
+      }
+
+      Matrix.Multiply((mtx_type*)bufferinvJ, (mtx_type*)transposeJ, this->numJoints, this->numJoints, 6, (mtx_type*)invJ);
+
+      Matrix.Multiply((mtx_type*)invJ, (mtx_type*)error, this->numJoints, 6, 1, (mtx_type*)dAngles);
+
+      for (int i = 0; i < this->numJoints; i++)
+      {
+          dAngles[i] = this->links[i].fromJoint->a + alpha*dAngles[i];
+          dAngles[i] = fmod(dAngles[i], 2*PI);
+      }
+
+      alpha = max(0.01, alpha*0.99);
+
+      forwardKinematics((double*)dAngles);
+
+      double np = sqrt(error[0]*error[0] + error[1]*error[1] + error[2]*error[2]);
+      double no = sqrt(error[3]*error[3] + error[4]*error[4] + error[5]*error[5]);
+      Serial.print(alpha);
+      Serial.print("\t");
+      Serial.print(np);
+      Serial.print("\t");
+      Serial.println(no);
+
+      if (np < REACHED_DESTINATION_THRESHOLD && no < REACHED_DESTINATION_THRESHOLD) break;
+
+    }
+
+    delete[] error;
+    delete[] dAngles;
+    delete[] bufferAxis;
+    delete[] bufferV;
+    delete[] bufferR;
+    delete[] bufferR2;
+    delete[] bufferR3;
+    delete[] oc;
+    delete[] J;
+    delete[] transposeJ;
+    delete[] bufferinvJ;
+    delete[] invJ;
+
+    if (this->ikStatus == SUCCESS) {
+      Serial.println("SUCCESS!");
+      this->ikStatus = SUCCESS;
+      return SUCCESS;
+    } else {
+      Serial.println("FAIL!");
+      this->ikStatus = FAILED;
+      return FAILED;
+    }
+}
 
 //////////////////////////////////////////
 
-/*
-SixDOF::IKState_t SixDOF::inverseKinematics(double x, double y, double z, double phi, double theta, double psi, double alpha)
-{
-    Link endEffector = this->links[this->numLinks-2];
-    
-    this->ikStatus = SUCCESS;
-    
-    this->newPose[0] = x;
-    this->newPose[1] = y;
-    this->newPose[2] = z;
-    this->newPose[3] = phi;
-    this->newPose[4] = theta;
-    this->newPose[5] = psi;
-
-    for(int i = 0; i < 6; i++)
-          for(int j = 0; j < this->numJoints; j++)
-                this->J[this->numJoints*i + j] = 0;
-
-    
-    computeJointJacobian((mtx_type*)endEffector.H0, (mtx_type*)this->eye, (mtx_type*)this->links[0].fromJoint->J);
-    ////Matrix.Print((mtx_type*)this->eye, 4, 4, "eye");
-    //Matrix.Print((mtx_type*)endEffector.H0, 4, 4, "H0");
-    //Matrix.Print((mtx_type*)this->links[0].fromJoint->J, 6, 1, "J0");
-    this->J[this->numJoints * 0 + 0] = this->links[0].fromJoint->J[0];
-    this->J[this->numJoints * 1 + 0] = this->links[0].fromJoint->J[1];
-    this->J[this->numJoints * 2 + 0] = this->links[0].fromJoint->J[2];
-    this->J[this->numJoints * 3 + 0] = this->links[0].fromJoint->J[3];
-    this->J[this->numJoints * 4 + 0] = this->links[0].fromJoint->J[4];
-    this->J[this->numJoints * 5 + 0] = this->links[0].fromJoint->J[5];
-    
-    for (int i = 1; i < this->numLinks-1; i++)
-    {
-        computeJointJacobian((mtx_type*)endEffector.H0, (mtx_type*)this->links[i-1].H0, (mtx_type*)this->links[i].fromJoint->J);
-        //Matrix.Print((mtx_type*)this->links[i-1].H0, 4, 4, "H");
-        //Matrix.Print((mtx_type*)this->links[i].fromJoint->J, 6, 1, "J"); 
-        
-        this->J[this->numJoints * 0 + i] = this->links[i].fromJoint->J[0];
-        this->J[this->numJoints * 1 + i] = this->links[i].fromJoint->J[1];
-        this->J[this->numJoints * 2 + i] = this->links[i].fromJoint->J[2];
-        this->J[this->numJoints * 3 + i] = this->links[i].fromJoint->J[3];
-        this->J[this->numJoints * 4 + i] = this->links[i].fromJoint->J[4];
-        this->J[this->numJoints * 5 + i] = this->links[i].fromJoint->J[5];
-    }
-    
-    // Compute determinant of J > SINGULARITY_THRESHOLD
-    double detJ = determinant((mtx_type*)this->J, this->numJoints);
-    if (abs(detJ) > SINGULARITY_THRESHOLD)
-    {
-        int success = 0;
-#ifdef INVERSE_JACOBIAN_METHOD
-        if (this->numJoints == 6) {
-          Matrix.Copy((mtx_type*)this->J, this->numJoints, this->numJoints, (mtx_type*)this->invJ);
-          success = Matrix.Invert((mtx_type*)this->invJ, this->numJoints);
-          if (success == 0) {
-            this->ikStatus = FAILED;
-            return FAILED;
-          }
-        } else {
-          Matrix.Transpose((mtx_type*)this->J, 6, this->numJoints, (mtx_type*)this->transposeJ);
-          Matrix.Multiply((mtx_type*)this->transposeJ, (mtx_type*)this->J, this->numJoints, 6, this->numJoints, (mtx_type*)this->bufferinvJ);
-          
-          success = Matrix.Invert((mtx_type*)this->bufferinvJ, this->numJoints);
-          if (success == 0) {
-            this->ikStatus = FAILED;
-            return FAILED;
-          }
-
-          Matrix.Multiply((mtx_type*)this->bufferinvJ, (mtx_type*)this->transposeJ, this->numJoints, this->numJoints, 6, (mtx_type*)this->invJ);
-        }
-#endif
-
-#ifdef PSEUDO_INVERSE_JACOBIAN_METHOD
-        Matrix.Transpose((mtx_type*)this->J, 6, this->numJoints, (mtx_type*)this->transposeJ);
-        Matrix.Multiply((mtx_type*)this->transposeJ, (mtx_type*)this->J, this->numJoints, 6, this->numJoints, (mtx_type*)this->bufferinvJ);
-        
-        success = Matrix.Invert((mtx_type*)this->bufferinvJ, this->numJoints);
-        if (success == 0) {
-          this->ikStatus = FAILED;
-          return FAILED;
-        }
-
-        Matrix.Multiply((mtx_type*)this->bufferinvJ, (mtx_type*)this->transposeJ, this->numJoints, this->numJoints, 6, (mtx_type*)this->invJ);
-#endif
-
-#ifdef TRANSPOSE_JACOBIAN_METHOD
-        Matrix.Transpose((mtx_type*)this->J, 6, this->numJoints, (mtx_type*)this->invJ);
-#endif
-
-        // SE
-        this->bufferV[0] = this->pose[0];
-        this->bufferV[1] = this->pose[1];
-        this->bufferV[2] = this->pose[2];
-        this->bufferU[0] = this->newPose[0];
-        this->bufferU[1] = this->newPose[1];
-        this->bufferU[2] = this->newPose[2];
-        double SEDistance = vecDistance((mtx_type*)bufferV, (mtx_type*)bufferU);
-        
-        Matrix.Subtract((mtx_type*)this->bufferU, (mtx_type*)this->bufferV, 3, 1, (mtx_type*)this->bufferW);
-        this->bufferPose[0] = this->bufferW[0];
-        this->bufferPose[1] = this->bufferW[1];
-        this->bufferPose[2] = this->bufferW[2];
-
-        // SO
-        this->bufferX[0] = this->pose[3];
-        this->bufferX[1] = this->pose[4];
-        this->bufferX[2] = this->pose[5];
-        this->bufferY[0] = this->newPose[3];
-        this->bufferY[1] = this->newPose[4];
-        this->bufferY[2] = this->newPose[5];
-
-        euler2angvel((mtx_type*)this->bufferX, (mtx_type*)this->bufferY, (mtx_type*)this->bufferZ);
-
-        this->bufferPose[3] = this->bufferZ[0];
-        this->bufferPose[4] = this->bufferZ[1];
-        this->bufferPose[5] = this->bufferZ[2];
-        
-        Matrix.Multiply((mtx_type*)this->invJ, (mtx_type*)this->bufferPose, this->numJoints, 6, 1, (mtx_type*)this->dAngles);
-
-        for (int i = 0; i < this->numJoints; i++)
-        {
-            this->dAngles[i] = this->links[i].fromJoint->a + alpha*this->dAngles[i];
-        }
-        
-        forwardKinematics((double*)dAngles);
-
-        if (SEDistance <= REACHED_DESTINATION_THRESHOLD) {
-          this->ikStatus = DEST_REACHED;
-          return DEST_REACHED; 
-        }
-    } else { 
-      Serial.println("Jacobian singular - Determinant below defined JACOBIAN_SINGULARITY_THRESHOLD");
-      this->ikStatus = FAILED;
-      return FAILED; 
-    }
-
-    this->ikStatus = SUCCESS;
-    return SUCCESS;
-}*/
 SixDOF::IKState_t SixDOF::getIKStatus()
 {
   return this->ikStatus;
@@ -765,6 +692,33 @@ double SixDOF::vecDistance(mtx_type* from, mtx_type* to)
   return sqrt(diffX*diffX + diffY*diffY + diffZ*diffZ);
 }
 
+double SixDOF::norm(mtx_type* v)
+{
+  double x = v[0];
+  double y = v[1];
+  double z = v[2];
+  return sqrt(x*x + y*y + z*z);
+}
+/*
+double SixDOF::norm6(mtx_type* v)
+{
+  double x = v[0];
+  double y = v[1];
+  double z = v[2];
+  double psi = v[3];
+  double phi = v[4];
+  double the = v[5];
+  return sqrt(x*x + y*y + z*z + psi*psi + phi*phi + the*the);
+}*/
+
+double SixDOF::dot(mtx_type* u, mtx_type* v)
+{
+  double x = u[0]*v[0];
+  double y = u[1]*v[1];
+  double z = u[2]*v[2];
+  return x+y+z;
+}
+
 double SixDOF::determinant(mtx_type* M, int len) 
 {
   double det = 0;
@@ -894,6 +848,35 @@ void SixDOF::euler2rot(mtx_type* euler, mtx_type* R)
     rotY(euler[1], R);
     rotZ(euler[2], R);
 }
+
+
+void SixDOF::t2r(mtx_type* H, mtx_type* R) 
+{
+    R[3 * 0 + 0] = H[4 * 0 + 0]; R[3 * 0 + 1] = H[4 * 0 + 1]; R[3 * 0 + 2] = H[4 * 0 + 2];
+    R[3 * 1 + 0] = H[4 * 1 + 0]; R[3 * 1 + 1] = H[4 * 1 + 1]; R[3 * 1 + 2] = H[4 * 1 + 2];
+    R[3 * 2 + 0] = H[4 * 2 + 0]; R[3 * 2 + 1] = H[4 * 2 + 1]; R[3 * 2 + 2] = H[4 * 2 + 2];
+}
+
+double SixDOF::traceR(mtx_type* R) 
+{
+    return R[3 * 0 + 0]+R[3 * 1 + 1]+R[3 * 2 + 2];
+}
+
+double SixDOF::maxDiagR(mtx_type* R) 
+{
+    return max(R[3 * 0 + 0], max(R[3 * 1 + 1], R[3 * 2 + 2]));
+}
+
+int SixDOF::maxDiagRCol(mtx_type* R) 
+{
+    if (R[3 * 0 + 0] > R[3 * 1 + 1] && R[3 * 0 + 0] > R[3 * 2 + 2])
+      return 0;
+    if (R[3 * 1 + 1] > R[3 * 0 + 0] && R[3 * 1 + 1] > R[3 * 2 + 2])
+      return 1;
+    if (R[3 * 2 + 2] > R[3 * 1 + 1] && R[3 * 2 + 2] > R[3 * 0 + 0])
+      return 2;
+}
+
 /*
 void SixDOF::euler2angvel(mtx_type* eulerFrom, mtx_type* eulerTo, mtx_type* angVel) 
 {
@@ -925,30 +908,46 @@ void SixDOF::euler2angvel(mtx_type* eulerFrom, mtx_type* eulerTo, mtx_type* angV
 
 //////////// ATTEMPT AT USING AXIS/ANGLE VECTORS INSTEAD OF EULER ANGLES /////////////////
 
-/*
+
 void SixDOF::rot2axis(mtx_type* R, mtx_type* ax)
 {
-    ax[0] = (R[3 * 2 + 1]-R[3 * 1 + 2]);
-    ax[1] = (R[3 * 0 + 2]-R[3 * 2 + 0]);
-    ax[3] = (R[3 * 1 + 0]-R[3 * 0 + 1]);
-    ax[4] = 0;
-    double norm = sqrt(ax[0]*ax[0] + ax[1]*ax[1] + ax[2]*ax[2]);
-    double theta = atan2(0.5*norm,0.5*(R[3 * 0 + 0]+R[3 * 1 + 1]+R[3 * 2 + 2]-1));
+    if (fabs(traceR(R)-3) < SINGULARITY_THRESHOLD) {
+      ax[0] = 0;
+      ax[1] = 0;
+      ax[2] = 0;
+      ax[3] = 0;
+    } else if (fabs(traceR(R)+1) < SINGULARITY_THRESHOLD) {
+      double mx = maxDiagR(R);
+      int mxCol = maxDiagRCol(R);
 
-    if (norm < SINGULARITY_THRESHOLD) {
-      eigDecomp((mtx_type*)R, 3, 3, 10, (mtx_type*)this->bufferV);
-      ax[0] = this->bufferV[0];
-      ax[1] = this->bufferV[1];
-      ax[2] = this->bufferV[2];
-      norm = sqrt(ax[0]*ax[0] + ax[1]*ax[1] + ax[2]*ax[2]);
+      double lg = sqrt(2*(1+mx));
+      ax[0] = (R[3*0+mxCol] + this->eye3[0][mxCol])/lg;
+      ax[1] = (R[3*1+mxCol] + this->eye3[1][mxCol])/lg;
+      ax[2] = (R[3*2+mxCol] + this->eye3[2][mxCol])/lg;
+      
+      ax[3] = PI;
+    } else {
+      ax[3] = acos((traceR(R)-1)/2);
+
+      mtx_type* skw = new mtx_type[3*3];
+      mtx_type* transposeR = new mtx_type[3*3];
+
+      Matrix.Transpose((mtx_type*)R, 3, 3, (mtx_type*)transposeR);
+      Matrix.Subtract((mtx_type*)R, (mtx_type*)transposeR, 3, 3, (mtx_type*)skw);
+      Matrix.Scale((mtx_type*)skw, 3, 3, 0.5/sin(ax[3]));
+      
+      ax[0] = 0.5*(skw[3*2+1]-skw[3*1+2]);
+      ax[1] = 0.5*(skw[3*0+2]-skw[3*2+0]);
+      ax[2] = 0.5*(skw[3*1+0]-skw[3*0+1]);
+
+      delete[] skw;
+      delete[] transposeR;
     }
-
-    ax[0] /= norm;
-    ax[1] /= norm;
-    ax[3] /= norm;
-    ax[4] = theta;
 }
 
+
+
+/*
 void SixDOF::axis2rot(mtx_type* ax, mtx_type* R)
 {
     double c = cos(ax[3]);
@@ -962,15 +961,17 @@ void SixDOF::axis2rot(mtx_type* ax, mtx_type* R)
     R[3 * 1 + 0] = t*x*y + z*s; R[3 * 1 + 1] = t*y*y + c;   R[3 * 1 + 2] = t*y*z - x*s;
     R[3 * 2 + 0] = t*x*z - y*s; R[3 * 2 + 1] = t*y*z + x*s; R[3 * 2 + 2] = t*z*z + c;
 }
+*/
 
 // Power Itera
+/*
 void SixDOF::eigDecomp(mtx_type* A, int m, int n, int iterations, mtx_type* out) 
 {
   // Ideally choose a random vector
   // To decrease the chance that our vector
   // Is orthogonal to the eigenvector
-  mtx_type* b_k = (mtx_type*)malloc(sizeof(mtx_type)*n);
-  mtx_type* b_k1 = (mtx_type*)malloc(sizeof(mtx_type)*n);
+  mtx_type* b_k = new mtx_type[n];
+  mtx_type* b_k1 = new mtx_type[n];
   for (int i = 0; i < n; i++) {
     b_k[i] = ((double)random(100));
   }
@@ -992,8 +993,8 @@ void SixDOF::eigDecomp(mtx_type* A, int m, int n, int iterations, mtx_type* out)
   
   Matrix.Copy((mtx_type*)b_k, n, 1, (mtx_type*)out);
 
-  free(b_k);
-  free(b_k1);
+  delete[] b_k;
+  delete[] b_k1;
 }
 */
 

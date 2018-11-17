@@ -15,7 +15,7 @@ double pose[] = {0, 0, 0, 0, 0, 0};
 
 double desiredPose1[] = {-0.4501, 0.15, 0.5777, 2.2923, 1.5234, -0.6599};
 double desiredPose2[] = {-0.4485, 0.1225, 0.1147, 2.3934, 2.0215, 0.5019};
-double desiredPose3[] = {0, -0.45, 0.05, -1.5708, 1.5708, -3.1416};
+double desiredPose3[] = {0, -0.45, 0.05, -1.5708, 1.5708, -2.3562};
 
 SixDOF manipulator(thetas, ds, alphas, as, 6);
 
@@ -71,8 +71,7 @@ void loop() {
                                   desiredPose1[2], 
                                   desiredPose1[3], 
                                   desiredPose1[4], 
-                                  desiredPose1[5], 0, 0.9);
-
+                                  desiredPose1[5], 0, 1.8);
 
     manipulator.getPose(pose);
   
@@ -124,7 +123,7 @@ void loop() {
   Serial.println();
 
   Serial.println("============================================");
-
+  
   delay(100);
   
   do {
@@ -134,7 +133,7 @@ void loop() {
                                   desiredPose2[2], 
                                   desiredPose2[3], 
                                   desiredPose2[4], 
-                                  desiredPose2[5], 0, 0.9);
+                                  desiredPose2[5], 0.05, 1.8);
 
 
     manipulator.getPose(pose);
@@ -182,6 +181,10 @@ void loop() {
 
   } while (manipulator.getIKStatus() == SixDOF::FAILED);
 
+  Serial.print("Free memory: ");
+  Serial.println(freeMemory());
+  Serial.println();
+
   Serial.println("============================================");
 
   delay(100);
@@ -193,7 +196,7 @@ void loop() {
                                   desiredPose3[2], 
                                   desiredPose3[3], 
                                   desiredPose3[4], 
-                                  desiredPose3[5], 0.05, 0.9);
+                                  desiredPose3[5], 0.05, 1.8);
 
 
     manipulator.getPose(pose);
@@ -240,6 +243,10 @@ void loop() {
     Serial.println();
 
   } while (manipulator.getIKStatus() == SixDOF::FAILED);
+
+  Serial.print("Free memory: ");
+  Serial.println(freeMemory());
+  Serial.println();
 
   Serial.println("============================================");
 
